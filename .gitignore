@@ -1,0 +1,8 @@
+# File chứa thông tin bảo mật môi trường, không bao giờ đưa lên version control
+.env
+
+# Thư mục vendor (nếu sử dụng Composer)
+vendor/
+
+# Các file log
+*.log

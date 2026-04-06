@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: webbannuochoa_app
+    ports:
+      - "80:80"
+    environment:
+      - DB_HOST=${DB_HOST:-db}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASS=${DB_PASS:-ndat0011}
+      - DB_NAME=${DB_NAME:-webbanhang}
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: webbannuochoa_db
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASS:-ndat0011}
+      - MYSQL_DATABASE=${DB_NAME:-webbanhang}
+    ports:
+      - "3306:3306"
+    volumes:
+      # Ánh xạ thư mục sql vào initdb để tự động tạo bảng dữ liệu lần chạy đầu tiên
+      - ./sql/webbanhang.sql:/docker-entrypoint-initdb.d/init.sql
+      # Lưu data để database không mất khi stop/xóa container
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  db_data:
