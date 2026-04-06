@@ -75,9 +75,11 @@ jobs:
             fi
             echo "🐳 Dùng lệnh: $COMPOSE_CMD"
 
-            # ── D: Dừng container cũ, build và khởi động lại ──────────────
-            echo "🔄 Dừng container cũ..."
-            $COMPOSE_CMD down --remove-orphans || true
+            # ── D: Dừng container cũ + XÓA VOLUME DB để init.sql chạy lại ──
+            echo "🔄 Dừng container cũ và xóa volume database..."
+            $COMPOSE_CMD down -v --remove-orphans || true
+            # Giải thích: -v xóa volume db_data, buộc MySQL chạy lại init.sql
+            # Dữ liệu sẽ bị reset - phù hợp cho môi trường production mới
 
             # ── D+: Giải phóng port 80 nếu bị chiếm bởi Apache/Nginx ──────
             echo "🔍 Kiểm tra port 80..."
@@ -87,7 +89,6 @@ jobs:
               systemctl stop nginx   2>/dev/null && echo "  → Đã tắt Nginx"   || true
               systemctl disable apache2 2>/dev/null || true
               systemctl disable nginx   2>/dev/null || true
-              # Nếu vẫn còn process khác chiếm port 80, kill nó
               fuser -k 80/tcp 2>/dev/null || true
               sleep 2
               echo "✅ Port 80 đã được giải phóng"
@@ -101,9 +102,21 @@ jobs:
             echo "▶️  Khởi động container..."
             $COMPOSE_CMD up -d
 
-            # ── E: Health check – kiểm tra container có chạy không ────────
-            echo "⏳ Chờ 15 giây cho container khởi động..."
-            sleep 15
+            # ── E: Chờ MySQL thật sự ready (không chỉ chờ theo thời gian) ──
+            echo "⏳ Chờ MySQL sẵn sàng (tối đa 90 giây)..."
+            MAX_WAIT=90
+            COUNT=0
+            until $COMPOSE_CMD exec -T db mysqladmin ping -h "localhost" --silent 2>/dev/null; do
+              COUNT=$((COUNT + 1))
+              if [ $COUNT -ge $MAX_WAIT ]; then
+                echo "❌ MySQL không khởi động được sau ${MAX_WAIT}s! Log lỗi:"
+                $COMPOSE_CMD logs --tail=30 db
+                exit 1
+              fi
+              echo "  [${COUNT}s] MySQL chưa sẵn sàng, đợi thêm..."
+              sleep 1
+            done
+            echo "✅ MySQL đã sẵn sàng sau ${COUNT}s!"
 
             echo "📊 Trạng thái container:"
             $COMPOSE_CMD ps
@@ -119,3 +132,4 @@ jobs:
             echo "✅ Triển khai THÀNH CÔNG: $(date)"
             echo "🌐 Website: http://${{ secrets.SERVER_HOST }}"
             echo "============================================"
+
