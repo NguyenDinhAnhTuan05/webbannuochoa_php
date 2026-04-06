@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
 # SCRIPT LẤY SSL CERTIFICATE LẦN ĐẦU CHO hocvien.online
-# Chạy lệnh này MỘT LẦN sau khi deploy xong
+# Chạy lệnh này MỘT LẦN trên server, sau khi GitHub Actions deploy xong
 #
-# Cách dùng (trên server):
+# Cách dùng:
 #   chmod +x init_ssl.sh
 #   sudo bash init_ssl.sh
 # =============================================================================
@@ -11,8 +11,10 @@
 set -e
 
 DOMAIN="hocvien.online"
-EMAIL="your-email@gmail.com"   # ← ĐỔI EMAIL CỦA BẠN VÀO ĐÂY
+EMAIL="nguyentuan834897@gmail.com"   # ← ĐỔI EMAIL CỦA BẠN VÀO ĐÂY
 DEPLOY_DIR="/var/www/webbannuochoa"
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
 cd "$DEPLOY_DIR"
 
@@ -20,22 +22,18 @@ echo "============================================"
 echo "🔐 Lấy SSL Certificate cho $DOMAIN"
 echo "============================================"
 
-# Bước 1: Tạo thư mục certbot
+# Bước 1: Kiểm tra containers đã chạy chưa
+if ! docker compose ps | grep -q "webbannuochoa_nginx"; then
+  echo -e "${YELLOW}⚠️  Nginx chưa chạy. Khởi động containers...${NC}"
+  docker compose up -d
+  sleep 5
+fi
+
+# Bước 2: Tạo thư mục certbot
 mkdir -p nginx/certbot/conf nginx/certbot/www
 
-# Bước 2: Dùng config HTTP-only tạm thời để Nginx khởi động được (chưa có cert)
-echo "📋 Dùng Nginx config HTTP-only tạm thời..."
-cp nginx/default.conf nginx/default.conf.backup
-cp nginx/default-http-only.conf nginx/default.conf
-
-# Bước 3: Khởi động Nginx
-docker compose up -d nginx app db
-
-echo "⏳ Chờ Nginx khởi động..."
-sleep 5
-
-# Bước 4: Chạy Certbot lấy certificate
-echo "🔑 Đang lấy SSL Certificate từ Let's Encrypt..."
+# Bước 3: Lấy SSL Certificate từ Let's Encrypt
+echo -e "${GREEN}🔑 Đang lấy SSL Certificate...${NC}"
 docker compose run --rm certbot certonly \
   --webroot \
   --webroot-path=/var/www/certbot \
@@ -45,20 +43,22 @@ docker compose run --rm certbot certonly \
   -d "$DOMAIN" \
   -d "www.$DOMAIN"
 
-echo ""
-echo "✅ Đã lấy SSL Certificate thành công!"
+echo -e "${GREEN}✅ Đã lấy SSL Certificate thành công!${NC}"
 
-# Bước 5: Khôi phục config HTTPS đầy đủ
-echo "📋 Khôi phục Nginx config HTTPS..."
-cp nginx/default.conf.backup nginx/default.conf
+# Bước 4: Swap sang config HTTPS đầy đủ
+echo "📋 Kích hoạt Nginx HTTPS config..."
+# Cập nhật docker-compose để mount config HTTPS
+sed -i 's|default-http-only.conf:/etc/nginx/conf.d/default.conf|default.conf:/etc/nginx/conf.d/default.conf|g' docker-compose.yml
 
-# Bước 6: Reload Nginx để dùng SSL
-echo "🔄 Reload Nginx với SSL..."
-docker compose exec nginx nginx -s reload
+# Bước 5: Restart Nginx với config mới
+echo "🔄 Restart Nginx với HTTPS..."
+docker compose up -d --force-recreate nginx
 
 echo ""
 echo "============================================"
-echo "🎉 HTTPS đã hoạt động tại: https://$DOMAIN"
+echo -e "${GREEN}🎉 THÀNH CÔNG!${NC}"
+echo "   🌐 HTTP  → https://$DOMAIN (auto redirect)"
+echo "   🔐 HTTPS → https://$DOMAIN"
 echo "============================================"
 echo ""
-echo "💡 Certificate sẽ tự động gia hạn mỗi 12 giờ."
+echo -e "${YELLOW}💡 SSL sẽ tự động gia hạn mỗi 12 giờ${NC}"
