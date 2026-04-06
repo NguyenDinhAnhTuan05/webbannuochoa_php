@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main # Tự động deploy khi push lên nhánh main
+  workflow_dispatch: # Cho phép chạy thủ công từ GitHub UI
 
 jobs:
   deploy:
