@@ -28,6 +28,8 @@ services:
       - ./sql/webbanhang.sql:/docker-entrypoint-initdb.d/init.sql
       # Lưu data để database không mất khi stop/xóa container
       - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
     restart: unless-stopped
 
   # ── Nginx Reverse Proxy + SSL (Let's Encrypt) ────────────────────────

@@ -96,6 +96,10 @@ jobs:
               echo "✅ Port 80 đang trống, sẵn sàng dùng"
             fi
 
+            # ── D*: Mở port 3306 cho Database (kết nối từ xa) ──────────────
+            echo "🔓 Mở port 3306 trên Firewall..."
+            ufw allow 3306/tcp || echo "⚠️  Không thể chạy ufw, bỏ qua..."
+
             echo "🔨 Build Docker image (--no-cache)..."
             $COMPOSE_CMD build --no-cache
 
