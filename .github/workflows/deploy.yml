@@ -1,40 +1,104 @@
-name: CI/CD Pipeline
+name: 🚀 CI/CD - Deploy to Production Server
 
 on:
   push:
     branches:
-      - main # Chạy action này khi có code push lên nhánh main
+      - main # Tự động deploy khi push lên nhánh main
 
 jobs:
   deploy:
+    name: Deploy to VPS
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      # ─────────────────────────────────────────────────────────────────────
+      # Bước 1: Checkout code (Github Actions cần đọc file repo)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Lên cấu hình & Deploy tới VPS qua SSH
+      # ─────────────────────────────────────────────────────────────────────
+      # Bước 2: SSH vào server và chạy toàn bộ quy trình deploy
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🔐 SSH & Deploy
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SERVER_HOST }} # Sét IP server 36.50.135.61 trong Github Secrets
-          username: ${{ secrets.SERVER_USERNAME }} # Tên user SSH (ví dụ: root)
-          key: ${{ secrets.SERVER_SSH_KEY }} # Private SSH key
-          port: ${{ secrets.SERVER_PORT }} # Thường là 22
+          host: ${{ secrets.SERVER_HOST }}        # IP server, ví dụ: 36.50.135.61
+          username: ${{ secrets.SERVER_USERNAME }} # User SSH, ví dụ: root hoặc ubuntu
+          key: ${{ secrets.SERVER_SSH_KEY }}       # Nội dung private key SSH (-----BEGIN...)
+          port: ${{ secrets.SERVER_PORT }}         # Cổng SSH, thường là 22
+          command_timeout: 20m                     # Tăng timeout khi build image lâu
           script: |
-            # Di chuyển tới thư mục cài đặt dự án (bạn phải tạo trên server trước)
-            cd /var/www/webbannuochoa || exit 1
-            
-            # Kéo (pull) bản code mới nhất
-            git pull origin main
-            
-            # Tạo file .env an toàn từ Github Secrets
-            echo "DB_HOST=db" > .env
-            echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-            echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
-            echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
-            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
-            
-            # Tắt container cũ, build lại và khởi động mới bằng docker-compose
-            docker-compose down
-            docker-compose build
-            docker-compose up -d
+            set -e
+            echo "============================================"
+            echo "🚀 Bắt đầu triển khai: $(date)"
+            echo "============================================"
+
+            DEPLOY_DIR="/var/www/webbannuochoa"
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+
+            # ── A: Clone hoặc Pull code ────────────────────────────────────
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              echo "📂 [LẦN ĐẦU] Chưa có project → Đang clone..."
+              mkdir -p "$DEPLOY_DIR"
+              git clone "$REPO_URL" "$DEPLOY_DIR"
+            else
+              echo "🔄 Project đã tồn tại → Đang pull bản mới nhất..."
+              cd "$DEPLOY_DIR"
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            cd "$DEPLOY_DIR"
+
+            # ── B: Tạo file .env từ GitHub Secrets ────────────────────────
+            # Dùng printf để tránh lỗi thụt dòng của heredoc
+            echo "📝 Ghi file .env..."
+            printf "DB_HOST=db\n" > .env
+            printf "DB_USER=${{ secrets.DB_USER }}\n" >> .env
+            printf "DB_PASS=${{ secrets.DB_PASS }}\n" >> .env
+            printf "DB_NAME=${{ secrets.DB_NAME }}\n" >> .env
+            printf "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}\n" >> .env
+            echo "✅ File .env đã được tạo"
+
+            # ── C: Kiểm tra Docker và chọn lệnh compose ───────────────────
+            if ! command -v docker &> /dev/null; then
+              echo "❌ Docker chưa cài đặt trên server! Chạy script setup_server.sh trước."
+              exit 1
+            fi
+
+            if command -v docker-compose &> /dev/null; then
+              COMPOSE_CMD="docker-compose"
+            else
+              COMPOSE_CMD="docker compose"
+            fi
+            echo "🐳 Dùng lệnh: $COMPOSE_CMD"
+
+            # ── D: Dừng container cũ, build và khởi động lại ──────────────
+            echo "🔄 Dừng container cũ..."
+            $COMPOSE_CMD down --remove-orphans || true
+
+            echo "🔨 Build Docker image (--no-cache)..."
+            $COMPOSE_CMD build --no-cache
+
+            echo "▶️  Khởi động container..."
+            $COMPOSE_CMD up -d
+
+            # ── E: Health check – kiểm tra container có chạy không ────────
+            echo "⏳ Chờ 15 giây cho container khởi động..."
+            sleep 15
+
+            echo "📊 Trạng thái container:"
+            $COMPOSE_CMD ps
+
+            APP_STATUS=$($COMPOSE_CMD ps -q app | xargs docker inspect --format='{{.State.Status}}' 2>/dev/null || echo "unknown")
+            if [ "$APP_STATUS" != "running" ]; then
+              echo "❌ Container 'app' không chạy được! Log lỗi:"
+              $COMPOSE_CMD logs --tail=50 app
+              exit 1
+            fi
+
+            echo "============================================"
+            echo "✅ Triển khai THÀNH CÔNG: $(date)"
+            echo "🌐 Website: http://${{ secrets.SERVER_HOST }}"
+            echo "============================================"
