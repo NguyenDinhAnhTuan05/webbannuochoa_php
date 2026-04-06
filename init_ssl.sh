@@ -11,7 +11,7 @@
 set -e
 
 DOMAIN="hocvien.online"
-EMAIL="nguyentuan834897@gmail.com"   # ← ĐỔI EMAIL CỦA BẠN VÀO ĐÂY
+EMAIL="nguyentuan834897@gmail.com"  
 DEPLOY_DIR="/var/www/webbannuochoa"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -34,7 +34,7 @@ mkdir -p nginx/certbot/conf nginx/certbot/www
 
 # Bước 3: Lấy SSL Certificate từ Let's Encrypt
 echo -e "${GREEN}🔑 Đang lấy SSL Certificate...${NC}"
-docker compose run --rm certbot certonly \
+docker compose run --rm --entrypoint "certbot" certbot certonly \
   --webroot \
   --webroot-path=/var/www/certbot \
   --email "$EMAIL" \
