@@ -2,7 +2,7 @@
 require_once '../config/config.php';
 
 $api_key = getenv('GEMINI_API_KEY') ?: '';
-$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $json_str = file_get_contents('php://input');
