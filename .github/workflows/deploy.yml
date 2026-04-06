@@ -25,7 +25,7 @@ jobs:
         with:
           host: ${{ secrets.SERVER_HOST }}        # IP server, ví dụ: 36.50.135.61
           username: ${{ secrets.SERVER_USERNAME }} # User SSH, ví dụ: root hoặc ubuntu
-          key: ${{ secrets.SERVER_SSH_KEY }}       # Nội dung private key SSH (-----BEGIN...)
+          password: ${{ secrets.SERVER_PASSWORD }} # Password SSH của server
           port: ${{ secrets.SERVER_PORT }}         # Cổng SSH, thường là 22
           command_timeout: 20m                     # Tăng timeout khi build image lâu
           script: |
