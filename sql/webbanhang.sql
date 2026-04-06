@@ -254,7 +254,7 @@ CREATE TABLE `nap_momo` (
   `trans_id` int(11) NOT NULL,
   `pay_type` varchar(30) NOT NULL,
   `code_cart` int(11) NOT NULL,
-  `created_at` date NOT NULL DEFAULT current_timestamp()
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
