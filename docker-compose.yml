@@ -11,6 +11,7 @@ services:
       - DB_USER=${DB_USER:-root}
       - DB_PASS=${DB_PASS:-ndat0011}
       - DB_NAME=${DB_NAME:-webbanhang}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     depends_on:
       - db
     restart: unless-stopped
