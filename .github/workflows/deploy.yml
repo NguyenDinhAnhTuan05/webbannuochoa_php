@@ -79,6 +79,22 @@ jobs:
             echo "🔄 Dừng container cũ..."
             $COMPOSE_CMD down --remove-orphans || true
 
+            # ── D+: Giải phóng port 80 nếu bị chiếm bởi Apache/Nginx ──────
+            echo "🔍 Kiểm tra port 80..."
+            if ss -tlnp | grep -q ':80 '; then
+              echo "⚠️  Port 80 đang bị chiếm! Đang tắt web server..."
+              systemctl stop apache2 2>/dev/null && echo "  → Đã tắt Apache2" || true
+              systemctl stop nginx   2>/dev/null && echo "  → Đã tắt Nginx"   || true
+              systemctl disable apache2 2>/dev/null || true
+              systemctl disable nginx   2>/dev/null || true
+              # Nếu vẫn còn process khác chiếm port 80, kill nó
+              fuser -k 80/tcp 2>/dev/null || true
+              sleep 2
+              echo "✅ Port 80 đã được giải phóng"
+            else
+              echo "✅ Port 80 đang trống, sẵn sàng dùng"
+            fi
+
             echo "🔨 Build Docker image (--no-cache)..."
             $COMPOSE_CMD build --no-cache
 
